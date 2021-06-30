@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using NoSqliteX.Extensions;
+using Lex;
 
 namespace NoSqliteX
 {
