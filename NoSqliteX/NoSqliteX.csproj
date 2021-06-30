@@ -5,4 +5,8 @@
     <RootNamespace>NoSqliteX</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Lex\Lex\Lex.csproj" />
+  </ItemGroup>
+
 </Project>
