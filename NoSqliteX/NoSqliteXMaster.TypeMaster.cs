@@ -9,6 +9,7 @@ namespace NoSqliteX
         internal class TypeMaster : ITypeMaster
         {
             [NoSqliteXKey]
+          
             public Type Type { get; set; }
             public List<string> TypeKeys { get; set; }
             public string TypeDistributedFolder { get; set; }
