@@ -8,16 +8,15 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Diagnostics;
-using Lex;
 using static NoSqliteX.NoSqliteXMaster;
-
+using static  NoSqliteX.Lex;
 
 namespace NoSqliteX
 {
     public abstract class NoSqliteXFileTable<T> where T : class
     {
         #region Fields
-
+        
         public List<T> Items { get; private set; }
 
         private readonly TypeMaster _typeMaster;
@@ -223,18 +222,22 @@ namespace NoSqliteX
             }
         }
 
+        private  bool HasAtrribute( PropertyDescriptor descriptor)
+        {
+            return Enumerable.Cast<object>(descriptor.Attributes).Any(x => x.GetType() == typeof(NoSqliteXKeyAttribute));
+        }
+
         private void GetKeys()
         {
             try
             {
                 var props = TypeDescriptor.GetProperties(typeof(T));
                 _keys = new List<string>();
-                foreach (var p in props.Cast<PropertyDescriptor>().Where(p =>
-                    p.Attributes.Cast<Attribute>().Any(a => a.GetType() == typeof(NoSqliteXKeyAttribute))))
+                props.ForEach<PropertyDescriptor>(n =>
                 {
-                    _keys.Add(p.Name);
-                }
-
+                    if(HasAtrribute(n))
+                        _keys.Add(n.Name);
+                });
                 _typeMaster.TypeKeys = _keys;
             }
             catch (Exception e)
