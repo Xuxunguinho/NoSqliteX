@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
-using Lex;
+
 
 namespace NoSqliteX
 {
@@ -168,7 +168,7 @@ namespace NoSqliteX
             }
             catch (Exception ex)
             {
-                // throw new Exception(ex.Message);
+                throw new Exception(ex.Message);
             }
         }
     }
