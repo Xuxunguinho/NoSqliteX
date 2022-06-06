@@ -2,14 +2,24 @@
 
   <PropertyGroup>
     <RootNamespace>NoSqliteX</RootNamespace>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <Company>https://github.com/Xuxunguinho</Company>
-    <AssemblyVersion>0.1.1</AssemblyVersion>
-    <FileVersion>0.1.1</FileVersion>
+    <AssemblyVersion>0.1.2</AssemblyVersion>
+    <FileVersion>0.1.2</FileVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Title>NoSqliteX</Title>
+    <Description>A library to use serialized objects or types stored in files as a database (works as an small document-oriented database). very useful to use in applications that need to store data however your developers do not want to have the job of dealing with SQL even writing code for serialization of data in XML or JSON.
+
+Offers even functions such as: Insert, Delete, Update and also uses triggers for these same functions : after &amp; Before Insert, After &amp; before Update,After &amp; Before Delete. also offers the use of primary keys and monitoring of them to prevent duplication of records .</Description>
+    <Copyright>https://github.com/xuxunguinho</Copyright>
+    <PackageProjectUrl>https://github.com/Xuxunguinho/NoSqliteX</PackageProjectUrl>
+    <PackageLicenseUrl></PackageLicenseUrl>
+    <RepositoryUrl>https://github.com/Xuxunguinho/NoSqliteX</RepositoryUrl>
+    <PackageTags>NoSQL SQLite</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Lex\Lex\Lex.csproj" />
+   
   </ItemGroup>
 
 </Project>
