@@ -4,12 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.Json;
 using static NoSqliteX.NoSqliteXMaster;
-using static  NoSqliteX.Lex;
 
 namespace NoSqliteX
 {
@@ -21,7 +20,6 @@ namespace NoSqliteX
 
         private readonly TypeMaster _typeMaster;
         private FileStream _stream;
-        private readonly BinaryFormatter _formatter;
         private readonly bool _useDistributedFolder, _haveTypeMaster, _haveCustonName;
         private List<string> _keys;
 
@@ -75,7 +73,7 @@ namespace NoSqliteX
                 _typeMaster = new TypeMaster {Type = typeof(T)};
 
                 _stream = Shareds.Stream;
-                _formatter = Shareds.Formatter;
+               
 
                 _haveCustonName = !string.IsNullOrEmpty(customFileName);
 
@@ -246,18 +244,18 @@ namespace NoSqliteX
             }
         }
 
-        private bool Save()
+        private  bool Save()
         {
             try
             {
                 _stream?.Close();
-                if (_fileName.IsNullOrEmpty()) return false;
+                 if (_fileName.IsNullOrEmpty()) return false;
                 _stream = File.Open(_fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                var coArray = (Items ?? new List<T>()).ToByteArray();
-                var base64 = Convert.ToBase64String(coArray);
-                _formatter.Serialize(_stream, base64);
-                _stream.Close();
-                GetData();
+                 var json =  JsonSerializer.Serialize(Items);
+                 var writer = new StreamWriter(_stream);
+                 writer.Write(json);
+                 _stream.Close();
+                 GetData();
 
                 return true;
             }
@@ -288,13 +286,9 @@ namespace NoSqliteX
                     Items = new List<T>();
 
                 if (!_stream.CanRead) return new List<T>();
-                var deserialized = _formatter.Deserialize(_stream) as string;
-
-                if (string.IsNullOrEmpty(deserialized)) return new List<T>();
-                var baseConverted = Convert.FromBase64String(deserialized);
-                var ms = new MemoryStream(baseConverted);
-                Items = _formatter.Deserialize(ms) as List<T>;
-                ms?.Dispose();
+                var deserialized = JsonSerializer.Deserialize<List<T>>(_stream);
+                Items = deserialized;
+                _stream?.Close();
 
                 if(Items.IsNullOrEmpty())
                     Items = new List<T>();
