@@ -12,7 +12,7 @@ namespace NoSqliteX
       
         public static string DataRootPath { get; set; }
         public static bool CanInit = false;
-        public static string FileExtension => "nsqlx";
+        public static string FileExtension => "json";
 
     }
 }

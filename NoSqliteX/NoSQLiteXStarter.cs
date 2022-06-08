@@ -7,7 +7,7 @@ namespace NoSqliteX
 {
     public static  class NoSqLiteXStarter
     {
-        
+        [Obsolete]
         public static void Start(NoSqLiteXStarterParams parameters,string rootSourcePath)
         {
 
@@ -26,6 +26,13 @@ namespace NoSqliteX
                
             };
 
+            Shareds.DataRootPath = rootSourcePath.ToUpper();
+            Create();
+        }
+        public static void Start(string rootSourcePath = null)
+        {
+            if (string.IsNullOrEmpty(rootSourcePath))
+                rootSourcePath = Path.Combine(Directory.GetCurrentDirectory(),"NoSQLiteXDataBase");
             Shareds.DataRootPath = rootSourcePath.ToUpper();
             Create();
         }

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 
 namespace NoSqliteX
@@ -46,9 +47,8 @@ namespace NoSqliteX
                     GetData();
                     return;
                 }
-                var task = Save();
-                task.Start();
-                await task;
+                await Save();
+              
             }
             catch (Exception e)
             {
@@ -91,41 +91,37 @@ namespace NoSqliteX
         /// </summary>
         private void GetData()
         {
-            _stream?.Close();
+            _stream = File.Open(FileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
             if (FileName.IsNullOrEmpty()) return;
             if (!File.Exists(FileName)) return;
-            _stream = File.Open(FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-
             if (_stream?.Length < 1)
             {
                 Items = new List<TypeMaster>();
                 return;
             }
-            var deserialized = _formatter.Deserialize(_stream) as string;
-            if (string.IsNullOrEmpty(deserialized)) return;
-            var baseConverted = Convert.FromBase64String(deserialized);
-            var ms = new MemoryStream(baseConverted);
-            Items = _formatter.Deserialize(ms) as List<TypeMaster>;
+            var ouText = File.ReadAllText(FileName);
+            var deserialized = JsonConvert.DeserializeObject<List<TypeMaster>>(ouText);
+            Items = deserialized;
             _stream?.Close();
-            ms?.Dispose();
         }
 
         /// <summary>
         ///  Usado para salvar os registos
         /// </summary>
         /// <returns></returns>
-        private Task<bool> Save()
+        private async Task<bool> Save()
         {
-            var task = new Task<bool>(() =>
-            {
+           
                 try
                 {
-                    _stream?.Close();
+                   
                     _stream = File.Open(FileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                    var coArray = Items.IsNullOrEmpty() ? new List<TypeMaster>().ToByteArray() : Items?.ToByteArray();
-                    var base64 = Convert.ToBase64String(coArray ?? throw new InvalidOperationException());
-                    _formatter.Serialize(_stream, base64);
-                    _stream?.Close();
+                    var json =  JsonConvert.SerializeObject(Items);
+                    var writer = new StreamWriter(_stream); 
+                    await    writer.WriteAsync(json);
+                    _stream.Close();
+                    
+                  
                     GetData();
                     return true;
                 }
@@ -133,9 +129,9 @@ namespace NoSqliteX
                 {
                     throw new Exception(e.Message);
                 }
-            });
+      
 
-            return task;
+      
         }
 
         /// <summary>
@@ -150,9 +146,8 @@ namespace NoSqliteX
                 if (overrideFileMode)
                 {
                     Items = new List<TypeMaster> {item};
-                    var task = Save();
-                    task.Start();
-                    await task;
+                 await Save();
+                   
                 }
                 else
                 {
@@ -161,9 +156,8 @@ namespace NoSqliteX
                         x.Type == item.Type && x.TypeDistributedFolder == item.TypeDistributedFolder &&
                         x.TypeDistributedFileName == item.TypeDistributedFileName)) return;
                     Items.Add(item);
-                    var task = Save();
-                    task.Start();
-                    await task;
+                    await Save();
+                 
                 }
             }
             catch (Exception ex)

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.Json;
+using  Newtonsoft.Json;
 using static NoSqliteX.NoSqliteXMaster;
 
 namespace NoSqliteX
@@ -30,13 +30,13 @@ namespace NoSqliteX
         #endregion
 
         #region XCrudEvents
-
+        
+        
         private readonly EventHandler<NoSqliteXTrigger<T>> _afterInsert;
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeInsert;
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeOverride;
         private readonly EventHandler<NoSqliteXTrigger<T>> _afterOverride;
-
-
+        
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterInserts;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterDeletes;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterOverrides;
@@ -49,7 +49,6 @@ namespace NoSqliteX
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _beforeUpdates;
 
         #endregion
-
         protected NoSqliteXFileTable(string distributedFolderName = null, string customFileName = null)
         {
             try
@@ -129,13 +128,79 @@ namespace NoSqliteX
                 throw;
             }
         }
+        protected NoSqliteXFileTable( string fileName = null)
+        {
+            try
+            {
+                if (!Shareds.CanInit) return;
+                _afterInsert += OnAfterInsert;
+                _beforeInsert += OnBeforeInsert;
+                _afterInserts += OnAfterInsert;
+                _afterOverride += OnAfterOverride;
+                _afterOverrides += OnAfterOverride;
 
+                _beforeOverride += OnBeforeOverride;
+                _beforeOverrides += OnBeforeOverride;
+
+                _afterDeletes += OnAfterDelete;
+                _afterUpdates += OnAfterUpdate;
+                _beforeInserts += OnBeforeInsert;
+                _beforeDeletes += OnBeforeDelete;
+                _beforeUpdates += OnBeforeUpdate;
+                var xMaster = new NoSqliteXMaster();
+                _typeMaster = new TypeMaster {Type = typeof(T)};
+
+                _stream = Shareds.Stream;
+               
+
+                _haveCustonName = !string.IsNullOrEmpty(fileName);
+          
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    _customFileName = "_"+ fileName;
+                    var st = _customFileName?.Replace("/", "_")?.Replace(' ', '_');
+                   
+                    if (_haveCustonName)
+                        _haveTypeMaster = xMaster.Items?.Exists(x =>
+                                              x.Type == typeof(T) &&
+                                              x.TypeDistributedFileName == st) ?? false;
+                    else
+                        _haveTypeMaster = xMaster.Items?.Exists(x =>
+                                              x.Type == typeof(T)) ?? false;
+                }
+               
+                if (_haveTypeMaster)
+                {
+                    var st = _customFileName?.Replace("/", "_")?.Replace(' ', '_');
+                    if (_haveCustonName)
+                        _typeMaster = xMaster.Items?.FirstOrDefault(x =>
+                            x.Type == typeof(T) &&
+                            x.TypeDistributedFileName == st);
+                    else
+                        _typeMaster = xMaster.Items?.FirstOrDefault(x =>
+                            x.Type == typeof(T));
+                }
+                else
+                {
+                    _typeMaster.TypeDistributedFileName= _customFileName;
+                }
+                GetKeys();
+                Create();
+                if (_haveTypeMaster) return;
+
+                xMaster.Insert(_typeMaster);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+        }
         public T this[int index]
         {
             get => Items[index];
             set => Items[index] = value;
         }
-
         private void Create()
         {
             try
@@ -147,10 +212,18 @@ namespace NoSqliteX
 
                 if (!_haveTypeMaster)
                 {
-                    if (!_useDistributedFolder)
+                    if (!_useDistributedFolder && !_haveCustonName)
                     {
                         _fileName = Shareds.DataRootPath +
                                     $@"\{filename}\/ Collection.{Shareds.FileExtension}";
+                        _typeMaster.TypeFileName = _fileName;
+                        _typeMaster.TypeDistributedFileName = _haveCustonName ? _customFileName : string.Empty;
+                        _typeMaster.TypeDistributedFolder = string.Empty;
+                    }
+                    else if (!_useDistributedFolder && _haveCustonName)
+                    {
+                        _fileName = Shareds.DataRootPath +
+                                    $@"\{filename}\/ {_customFileName}.{Shareds.FileExtension}";
                         _typeMaster.TypeFileName = _fileName;
                         _typeMaster.TypeDistributedFileName = _haveCustonName ? _customFileName : string.Empty;
                         _typeMaster.TypeDistributedFolder = string.Empty;
@@ -194,15 +267,11 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-
         private string GetFilesFolderName()
         {
             try
             {
                 var props = this.GetType().GetCustomAttributes(false);
-                //foreach (var p in props)
-                //{               
-                // for every property loop through all attributes
                 foreach (Attribute a in props)
                 {
                     if (a.GetType() != typeof(NoSqLiteXFileTableAttribute)) continue;
@@ -211,7 +280,6 @@ namespace NoSqliteX
                         throw new Exception("Error: cant not find a FileTableName ");
                     return name.TableName.ToUpper();
                 }
-
                 return string.Empty;
             }
             catch (Exception e)
@@ -219,12 +287,10 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-
-        private  bool HasAtrribute( PropertyDescriptor descriptor)
+        private static bool HasAtrribute( PropertyDescriptor descriptor)
         {
             return Enumerable.Cast<object>(descriptor.Attributes).Any(x => x.GetType() == typeof(NoSqliteXKeyAttribute));
         }
-
         private void GetKeys()
         {
             try
@@ -243,19 +309,19 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-
         private  bool Save()
         {
             try
             {
-                _stream?.Close();
-                 if (_fileName.IsNullOrEmpty()) return false;
-                _stream = File.Open(_fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                 var json =  JsonSerializer.Serialize(Items);
-                 var writer = new StreamWriter(_stream);
-                 writer.Write(json);
-                 _stream.Close();
-                 GetData();
+                 _stream?.Close();
+                  if (_fileName.IsNullOrEmpty()) return false;
+                  var  stream = File.Open(_fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                  var json =  JsonConvert.SerializeObject(Items);
+                  var writer = new StreamWriter(stream);
+                  writer.Write(json);
+                  writer.Dispose();
+                  writer.Close();
+                  GetData();
 
                 return true;
             }
@@ -264,8 +330,7 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-
-        public List<T> GetData()
+        private List<T> GetData()
         {
             try
             {
@@ -275,20 +340,10 @@ namespace NoSqliteX
 #endif
                 if (_fileName.IsNullOrEmpty()) return new List<T>();
                 if (!File.Exists(_fileName)) return new List<T>();
-                _stream = File.Open(_fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-                //_stream = File.OpenRead(FileName);
-                if (_stream.Length < 1)
-                {
-                    Items = new List<T>();
-                    return Items;
-                }
-                if(Items.IsNullOrEmpty())
-                    Items = new List<T>();
-
-                if (!_stream.CanRead) return new List<T>();
-                var deserialized = JsonSerializer.Deserialize<List<T>>(_stream);
+                
+                var ouText = File.ReadAllText(_fileName);
+                var deserialized = JsonConvert.DeserializeObject<List<T>>(ouText);
                 Items = deserialized;
-                _stream?.Close();
 
                 if(Items.IsNullOrEmpty())
                     Items = new List<T>();
@@ -608,7 +663,46 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-
+        /// <summary>
+        /// Insere ou Atualiza um item na Tabela
+        /// </summary>
+        /// <param name="item"> Item a ser Inserido </param>
+        /// <param name="setter"></param>
+        /// <param name="equater"></param>
+        public bool Insert(T item, Action<T, T> setter, Func<T, bool> equater)
+        {
+            try
+            {
+                if (item is null) return false;
+                if (setter is null || equater is null)
+                    throw new NullReferenceException();
+                OnBeforeInsert(item);
+                {
+                    if (Items.IsNullOrEmpty()) Items = new List<T>();
+                    if (_keys.IsNullOrEmpty())
+                    {
+                        if (Items.Contains(item)) return false;
+                        Items.Add(item);
+                        if (!Save()) return false;
+                        OnAfterInsert(item);
+                        return true;
+                    }
+                    
+                    if (Items.ContainsKey(item, _keys))
+                    {
+                        return Update(s => setter(s, item), s => equater(s));
+                    }
+                    Items.Add(item);
+                    if (!Save()) return false;
+                    OnAfterInsert(item);
+                    return true;
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
         /// <summary>
         /// Insere uma Lista de  novos items ao FileTable
         /// </summary>
