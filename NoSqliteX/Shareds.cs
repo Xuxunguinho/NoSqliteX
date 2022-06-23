@@ -7,9 +7,7 @@ namespace NoSqliteX
     {
      
         public static BinaryFormatter Formatter { get; set; }
-       
         public static FileStream Stream { get; set; }
-      
         public static string DataRootPath { get; set; }
         public static bool CanInit = false;
         public static string FileExtension => "json";

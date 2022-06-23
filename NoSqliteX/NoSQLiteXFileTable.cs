@@ -15,13 +15,14 @@ namespace NoSqliteX
     public abstract class NoSqliteXFileTable<T> where T : class
     {
         #region Fields
-        
+
         public List<T> Items { get; private set; }
 
         private readonly TypeMaster _typeMaster;
         private FileStream _stream;
         private readonly bool _useDistributedFolder, _haveTypeMaster, _haveCustonName;
         private List<string> _keys;
+        private List<string> _indentityKeys;
 
         private string _fileName;
         private readonly string _customFileName;
@@ -30,13 +31,13 @@ namespace NoSqliteX
         #endregion
 
         #region XCrudEvents
-        
-        
+
+
         private readonly EventHandler<NoSqliteXTrigger<T>> _afterInsert;
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeInsert;
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeOverride;
         private readonly EventHandler<NoSqliteXTrigger<T>> _afterOverride;
-        
+
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterInserts;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterDeletes;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterOverrides;
@@ -49,6 +50,7 @@ namespace NoSqliteX
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _beforeUpdates;
 
         #endregion
+
         protected NoSqliteXFileTable(string distributedFolderName = null, string customFileName = null)
         {
             try
@@ -69,10 +71,10 @@ namespace NoSqliteX
                 _beforeDeletes += OnBeforeDelete;
                 _beforeUpdates += OnBeforeUpdate;
                 var xMaster = new NoSqliteXMaster();
-                _typeMaster = new TypeMaster {Type = typeof(T)};
+                _typeMaster = new TypeMaster { Type = typeof(T) };
 
                 _stream = Shareds.Stream;
-               
+
 
                 _haveCustonName = !string.IsNullOrEmpty(customFileName);
 
@@ -87,11 +89,11 @@ namespace NoSqliteX
 
                     if (_haveCustonName)
                         _haveTypeMaster = xMaster.Items?.Exists(x =>
-                                              x.Type == typeof(T) && x.TypeDistributedFolder == dist &&
-                                              x.TypeDistributedFileName == st) ?? false;
+                            x.Type == typeof(T) && x.TypeDistributedFolder == dist &&
+                            x.TypeDistributedFileName == st) ?? false;
                     else
                         _haveTypeMaster = xMaster.Items?.Exists(x =>
-                                              x.Type == typeof(T) && x.TypeDistributedFolder == dist) ?? false;
+                            x.Type == typeof(T) && x.TypeDistributedFolder == dist) ?? false;
                 }
                 else
                 {
@@ -128,7 +130,8 @@ namespace NoSqliteX
                 throw;
             }
         }
-        protected NoSqliteXFileTable( string fileName = null)
+
+        protected NoSqliteXFileTable(string fileName = null)
         {
             try
             {
@@ -148,27 +151,27 @@ namespace NoSqliteX
                 _beforeDeletes += OnBeforeDelete;
                 _beforeUpdates += OnBeforeUpdate;
                 var xMaster = new NoSqliteXMaster();
-                _typeMaster = new TypeMaster {Type = typeof(T)};
+                _typeMaster = new TypeMaster { Type = typeof(T) };
 
                 _stream = Shareds.Stream;
-               
+
 
                 _haveCustonName = !string.IsNullOrEmpty(fileName);
-          
+
                 if (!string.IsNullOrEmpty(fileName))
                 {
-                    _customFileName = "_"+ fileName;
+                    _customFileName = "_" + fileName;
                     var st = _customFileName?.Replace("/", "_")?.Replace(' ', '_');
-                   
+
                     if (_haveCustonName)
                         _haveTypeMaster = xMaster.Items?.Exists(x =>
-                                              x.Type == typeof(T) &&
-                                              x.TypeDistributedFileName == st) ?? false;
+                            x.Type == typeof(T) &&
+                            x.TypeDistributedFileName == st) ?? false;
                     else
                         _haveTypeMaster = xMaster.Items?.Exists(x =>
-                                              x.Type == typeof(T)) ?? false;
+                            x.Type == typeof(T)) ?? false;
                 }
-               
+
                 if (_haveTypeMaster)
                 {
                     var st = _customFileName?.Replace("/", "_")?.Replace(' ', '_');
@@ -182,8 +185,9 @@ namespace NoSqliteX
                 }
                 else
                 {
-                    _typeMaster.TypeDistributedFileName= _customFileName;
+                    _typeMaster.TypeDistributedFileName = _customFileName;
                 }
+
                 GetKeys();
                 Create();
                 if (_haveTypeMaster) return;
@@ -196,11 +200,13 @@ namespace NoSqliteX
                 throw;
             }
         }
+
         public T this[int index]
         {
             get => Items[index];
             set => Items[index] = value;
         }
+
         private void Create()
         {
             try
@@ -267,6 +273,7 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
+
         private string GetFilesFolderName()
         {
             try
@@ -275,11 +282,12 @@ namespace NoSqliteX
                 foreach (Attribute a in props)
                 {
                     if (a.GetType() != typeof(NoSqLiteXFileTableAttribute)) continue;
-                    var name = (NoSqLiteXFileTableAttribute) a;
+                    var name = (NoSqLiteXFileTableAttribute)a;
                     if (string.IsNullOrEmpty(name?.TableName))
                         throw new Exception("Error: cant not find a FileTableName ");
                     return name.TableName.ToUpper();
                 }
+
                 return string.Empty;
             }
             catch (Exception e)
@@ -287,20 +295,33 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-        private static bool HasAtrribute( PropertyDescriptor descriptor)
+
+        private static bool HasKeyAtrribute(PropertyDescriptor descriptor)
         {
-            return Enumerable.Cast<object>(descriptor.Attributes).Any(x => x.GetType() == typeof(NoSqliteXKeyAttribute));
+            return Enumerable.Cast<object>(descriptor.Attributes).Any(x => x.GetType() == typeof(NoSqliteXKeyAttribute) || x.GetType() == typeof(NoSqliteXIndetityKeyAttribute));
         }
+        private static bool HasIndentityKeyAtrribute(PropertyDescriptor descriptor)
+        {
+            return Enumerable.Cast<object>(descriptor.Attributes).Any(x =>  x.GetType() == typeof(NoSqliteXIndetityKeyAttribute));
+        }
+        /// <summary>
+        /// obtein keys from Type T
+        /// </summary>
+        /// <exception cref="Exception"></exception>
         private void GetKeys()
         {
             try
             {
                 var props = TypeDescriptor.GetProperties(typeof(T));
                 _keys = new List<string>();
+                _indentityKeys = new List<string>();
                 props.ForEach<PropertyDescriptor>(n =>
                 {
-                    if(HasAtrribute(n))
+                    if(HasKeyAtrribute(n))
                         _keys.Add(n.Name);
+                    if (!HasIndentityKeyAtrribute(n)) return;
+                    _keys.Add(n.Name);
+                    _indentityKeys.Add(n.Name);
                 });
                 _typeMaster.TypeKeys = _keys;
             }
@@ -309,6 +330,31 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
+        /// <summary>
+        ///  Assign value to identity field
+        /// </summary>
+        /// <param name="item"></param>
+        /// <exception cref="Exception"></exception>
+        private void SetIndentityValue(T item)
+        {
+            try
+            {
+                var props = TypeDescriptor.GetProperties(typeof(T));
+                item.CareNull();
+                props.ForEach<PropertyDescriptor>(n =>
+                {
+                    if (!_indentityKeys.Contains(n.Name)) return;
+                    var value = n.GetValue(item)?.ToString().IsNullOrEmpty() ?? true;
+                    if(value)
+                        n.SetValue(item,TokensHelper.GenerateId());
+                });
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
+
         private  bool Save()
         {
             try
@@ -369,11 +415,12 @@ namespace NoSqliteX
 
         private void OnBeforeInsert(T item)
         {
+            
             _beforeInsert?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
         private void OnBeforeOverride(T item)
-        {
+        {    
             _beforeOverride?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
@@ -557,6 +604,7 @@ namespace NoSqliteX
             try
             {
                 if (item is null) return false;
+                SetIndentityValue(item);
                 OnBeforeOverride(item);
                 Items = new List<T> {item};
                 if (!Save()) return false;
@@ -574,12 +622,16 @@ namespace NoSqliteX
         /// </summary>
         /// <param name="items"></param>
         /// <returns></returns>
-        public bool Override(List<T> items)
+        public bool  Override(List<T> items)
         {
             try
             {
                 if (items.IsNullOrEmpty()) return false;
                 OnBeforeOverride(items);
+                foreach (var item in items)
+                {
+                    SetIndentityValue(item);
+                }
                 Items = items;
                 if (!Save()) return false;
                 OnAfterOverride(items);
@@ -600,6 +652,9 @@ namespace NoSqliteX
             try
             {
                 if (item is null) return false;
+              
+                    SetIndentityValue(item);
+                
                 OnBeforeInsert(item);
 
                 if (Items.IsNullOrEmpty()) Items = new List<T>();
@@ -634,6 +689,9 @@ namespace NoSqliteX
             try
             {
                 if (item is null) return false;
+             
+                
+             
                 if (setter is null || equater is null)
                     throw new NullReferenceException();
                 OnBeforeInsert(item);
@@ -642,6 +700,7 @@ namespace NoSqliteX
                     if (_keys.IsNullOrEmpty())
                     {
                         if (Items.Contains(item)) return false;
+                          SetIndentityValue(item);
                         Items.Add(item);
                         if (!Save()) return false;
                         OnAfterInsert(item);
@@ -652,6 +711,7 @@ namespace NoSqliteX
                     {
                         return Update(s => setter(s, item), s => equater(s, item));
                     }
+                    SetIndentityValue(item);
                     Items.Add(item);
                     if (!Save()) return false;
                     OnAfterInsert(item);
@@ -681,7 +741,7 @@ namespace NoSqliteX
                     if (Items.IsNullOrEmpty()) Items = new List<T>();
                     if (_keys.IsNullOrEmpty())
                     {
-                        if (Items.Contains(item)) return false;
+                        if (Items.Contains(item)) return false;SetIndentityValue(item);
                         Items.Add(item);
                         if (!Save()) return false;
                         OnAfterInsert(item);
@@ -692,6 +752,7 @@ namespace NoSqliteX
                     {
                         return Update(s => setter(s, item), s => equater(s));
                     }
+                    SetIndentityValue(item);
                     Items.Add(item);
                     if (!Save()) return false;
                     OnAfterInsert(item);
@@ -717,6 +778,10 @@ namespace NoSqliteX
 #endif
                 var alterFlag = new List<bool>();
                 if (items.IsNullOrEmpty()) return false;
+                foreach (var item in items)
+                {
+                    SetIndentityValue(item);
+                }
                 OnBeforeInsert(items);
                 {
                     if (Items.IsNullOrEmpty()) Items = new List<T>();
@@ -772,6 +837,11 @@ namespace NoSqliteX
                 if (setter is null || equater is null)
                     throw new NullReferenceException();
 
+                
+                foreach (var item in items)
+                {
+                    SetIndentityValue(item);
+                }
                 OnBeforeInsert(items);
 
                 if (Items.IsNullOrEmpty()) Items = new List<T>();
@@ -914,5 +984,15 @@ namespace NoSqliteX
         }
 
         #endregion
+        
+        #region Getters
+
+        public IEnumerable<T> Where(Func<T, bool> equater)
+        {
+            return Items?.Where(equater);
+        }
+
+        #endregion
+        
     }
 }
