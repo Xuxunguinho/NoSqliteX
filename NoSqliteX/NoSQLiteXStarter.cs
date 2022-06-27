@@ -29,11 +29,12 @@ namespace NoSqliteX
             Shareds.DataRootPath = rootSourcePath.ToUpper();
             Create();
         }
-        public static void Start(string rootSourcePath = null)
+        public static void Start(string rootSourcePath = null, string cryptoPassword = null)
         {
             if (string.IsNullOrEmpty(rootSourcePath))
                 rootSourcePath = Path.Combine(Directory.GetCurrentDirectory(),"NoSQLiteXDataBase");
             Shareds.DataRootPath = rootSourcePath.ToUpper();
+            Shareds.CriptoPassword = cryptoPassword ?? "nosqlite@#234";
             Create();
         }
 

@@ -16,14 +16,23 @@ namespace NoSqliteX
     {
         #region Fields
 
-        public List<T> Items { get; private set; }
+        private List<T> _items = new List<T>();
+        public List<T> Items
+        {
+            get => _items;
+            private set
+            {
+                _items = value;
+
+            }
+        }
 
         private readonly TypeMaster _typeMaster;
         private FileStream _stream;
         private readonly bool _useDistributedFolder, _haveTypeMaster, _haveCustonName;
         private List<string> _keys;
         private List<string> _indentityKeys;
-
+        private List<string> _cryptoKeys = new List<string>();
         private string _fileName;
         private readonly string _customFileName;
         private readonly string _distributedFolder;
@@ -37,7 +46,7 @@ namespace NoSqliteX
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeInsert;
         private readonly EventHandler<NoSqliteXTrigger<T>> _beforeOverride;
         private readonly EventHandler<NoSqliteXTrigger<T>> _afterOverride;
-
+        private readonly EventHandler<NoSqliteXTrigger<T>> _beforeUpdate;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterInserts;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterDeletes;
         private readonly EventHandler<NoSqliteXTrigger<List<T>>> _afterOverrides;
@@ -62,6 +71,10 @@ namespace NoSqliteX
                 _afterOverride += OnAfterOverride;
                 _afterOverrides += OnAfterOverride;
 
+                _beforeUpdate += OnBeforeUpdate;
+                
+                
+                
                 _beforeOverride += OnBeforeOverride;
                 _beforeOverrides += OnBeforeOverride;
 
@@ -141,7 +154,7 @@ namespace NoSqliteX
                 _afterInserts += OnAfterInsert;
                 _afterOverride += OnAfterOverride;
                 _afterOverrides += OnAfterOverride;
-
+                _beforeUpdate += OnBeforeUpdate;
                 _beforeOverride += OnBeforeOverride;
                 _beforeOverrides += OnBeforeOverride;
 
@@ -303,6 +316,9 @@ namespace NoSqliteX
         private static bool HasIndentityKeyAtrribute(PropertyDescriptor descriptor)
         {
             return Enumerable.Cast<object>(descriptor.Attributes).Any(x =>  x.GetType() == typeof(NoSqliteXIndetityKeyAttribute));
+        } private static bool HasCryptoKeyAtrribute(PropertyDescriptor descriptor)
+        {
+            return Enumerable.Cast<object>(descriptor.Attributes).Any(x =>  x.GetType() == typeof(NoSqliteXCryptoKeyAttribute));
         }
         /// <summary>
         /// obtein keys from Type T
@@ -318,7 +334,9 @@ namespace NoSqliteX
                 props.ForEach<PropertyDescriptor>(n =>
                 {
                     if(HasKeyAtrribute(n))
-                        _keys.Add(n.Name);
+                        _keys.Add(n.Name); 
+                    if(HasCryptoKeyAtrribute(n))
+                        _cryptoKeys.Add(n.Name);
                     if (!HasIndentityKeyAtrribute(n)) return;
                     _keys.Add(n.Name);
                     _indentityKeys.Add(n.Name);
@@ -335,7 +353,7 @@ namespace NoSqliteX
         /// </summary>
         /// <param name="item"></param>
         /// <exception cref="Exception"></exception>
-        private void SetIndentityValue(T item)
+        private void SetIndentity(T item)
         {
             try
             {
@@ -343,10 +361,96 @@ namespace NoSqliteX
                 item.CareNull();
                 props.ForEach<PropertyDescriptor>(n =>
                 {
-                    if (!_indentityKeys.Contains(n.Name)) return;
-                    var value = n.GetValue(item)?.ToString().IsNullOrEmpty() ?? true;
-                    if(value)
-                        n.SetValue(item,TokensHelper.GenerateId());
+                    if (_indentityKeys.Contains(n.Name))
+                    {
+                         var value = n.GetValue(item)?.ToString().IsNullOrEmpty() ?? true;
+                                            if(value)
+                                                n.SetValue(item,TokensHelper.GenerateId());
+                    }
+                    
+                });
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        } 
+        private void SetIndentity(List<T> item)
+        {
+            try
+            {
+                foreach (var x in item)
+                {
+                    SetIndentity(x);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
+        private void Encrypt(T item)
+        {
+            try
+            {
+                var props = TypeDescriptor.GetProperties(typeof(T));
+                item.CareNull();
+                props.ForEach<PropertyDescriptor>(n =>
+                {
+                    if (_cryptoKeys.Contains(n.Name))
+                    {
+                         var hasValue = !n.GetValue(item)?.ToString().IsNullOrEmpty() ?? false;
+                         if (hasValue)
+                         {
+                             var value = n.GetValue(item)?.ToString().EncryptPlainTextToCipherText();
+                                                                         n.SetValue(item,value);
+                         }
+
+                         
+                    }
+
+                   
+
+                });
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
+        private void Encrypt(IEnumerable<T> item)
+        {
+            try
+            {
+                foreach (var x in item)
+                {
+                    Encrypt(x);
+                }
+               
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
+        private void DecryptItemValue(T item)
+        {
+            try
+            {
+                var props = TypeDescriptor.GetProperties(typeof(T));
+                props.ForEach<PropertyDescriptor>(n =>
+                {
+                    if (_cryptoKeys.Contains(n.Name))
+                    {
+                        var hasValue = n.GetValue(item)?.ToString()?.IsNullOrEmpty() ?? true;
+                        if (!hasValue)
+                        {
+                            var value = n.GetValue(item)?.ToString()?.DecryptCipherTextToPlainText();
+                            n.SetValue(item, value);
+                        }
+
+                      
+                    }
                 });
             }
             catch (Exception e)
@@ -389,6 +493,14 @@ namespace NoSqliteX
                 
                 var ouText = File.ReadAllText(_fileName);
                 var deserialized = JsonConvert.DeserializeObject<List<T>>(ouText);
+                
+             
+                foreach (var x in deserialized)
+                {
+                    DecryptItemValue(x);
+                    
+                }
+
                 Items = deserialized;
 
                 if(Items.IsNullOrEmpty())
@@ -409,18 +521,21 @@ namespace NoSqliteX
         #region EventsInvoke
 
         private void OnAfterInsert(T item)
-        {
+        { 
             _afterInsert?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
         private void OnBeforeInsert(T item)
         {
-            
+            SetIndentity(item);
+            Encrypt(item);
             _beforeInsert?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
         private void OnBeforeOverride(T item)
-        {    
+        {
+            SetIndentity(item);
+            Encrypt(item);
             _beforeOverride?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
@@ -440,20 +555,25 @@ namespace NoSqliteX
         }
 
         private void OnAfterDelete(List<T> item)
-        {
+        { 
             _afterDeletes?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         }
 
         private void OnBeforeInsert(List<T> item)
         {
+             SetIndentity(item);
+             Encrypt(item);
             _beforeInserts?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         }
-
         private void OnBeforeUpdate(List<T> item)
         {
+             // Encrypt(item);
             _beforeUpdates?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
+        } private void OnBeforeUpdate(T item)
+        {
+             Encrypt(item);
+            _beforeUpdate?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
-
         private void OnBeforeDelete(List<T> item)
         {
             _beforeDeletes?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
@@ -462,6 +582,8 @@ namespace NoSqliteX
 
         private void OnBeforeOverride(List<T> item)
         {
+            SetIndentity(item);
+            Encrypt(item);
             _beforeOverrides?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         }
 
@@ -491,6 +613,7 @@ namespace NoSqliteX
         /// <param name="e"></param>
         protected virtual void OnBeforeInsert(object sender, NoSqliteXTrigger<T> e)
         {
+           
             // execute aqui o codigo para antes de inserir o Item [e.Deleted] dos registos
         }
 
@@ -579,7 +702,10 @@ namespace NoSqliteX
         {
             // execute aqui o codigo  
         }
-
+        protected virtual void OnBeforeUpdate(object sender, NoSqliteXTrigger<T> e)
+        {
+            // execute aqui o codigo  
+        }
         /// <summary>
         /// The name of the method says it all
         /// </summary>
@@ -604,7 +730,7 @@ namespace NoSqliteX
             try
             {
                 if (item is null) return false;
-                SetIndentityValue(item);
+               
                 OnBeforeOverride(item);
                 Items = new List<T> {item};
                 if (!Save()) return false;
@@ -628,10 +754,7 @@ namespace NoSqliteX
             {
                 if (items.IsNullOrEmpty()) return false;
                 OnBeforeOverride(items);
-                foreach (var item in items)
-                {
-                    SetIndentityValue(item);
-                }
+               
                 Items = items;
                 if (!Save()) return false;
                 OnAfterOverride(items);
@@ -653,7 +776,7 @@ namespace NoSqliteX
             {
                 if (item is null) return false;
               
-                    SetIndentityValue(item);
+                  
                 
                 OnBeforeInsert(item);
 
@@ -694,13 +817,14 @@ namespace NoSqliteX
              
                 if (setter is null || equater is null)
                     throw new NullReferenceException();
-                OnBeforeInsert(item);
+                
                 {
                     if (Items.IsNullOrEmpty()) Items = new List<T>();
                     if (_keys.IsNullOrEmpty())
-                    {
+                    {   
+                        OnBeforeInsert(item);
                         if (Items.Contains(item)) return false;
-                          SetIndentityValue(item);
+                 
                         Items.Add(item);
                         if (!Save()) return false;
                         OnAfterInsert(item);
@@ -711,7 +835,8 @@ namespace NoSqliteX
                     {
                         return Update(s => setter(s, item), s => equater(s, item));
                     }
-                    SetIndentityValue(item);
+                    
+                    OnBeforeInsert(item);
                     Items.Add(item);
                     if (!Save()) return false;
                     OnAfterInsert(item);
@@ -736,12 +861,12 @@ namespace NoSqliteX
                 if (item is null) return false;
                 if (setter is null || equater is null)
                     throw new NullReferenceException();
-                OnBeforeInsert(item);
+               
                 {
                     if (Items.IsNullOrEmpty()) Items = new List<T>();
                     if (_keys.IsNullOrEmpty())
-                    {
-                        if (Items.Contains(item)) return false;SetIndentityValue(item);
+                    {OnBeforeInsert(item);
+                        if (Items.Contains(item)) return false;
                         Items.Add(item);
                         if (!Save()) return false;
                         OnAfterInsert(item);
@@ -752,7 +877,7 @@ namespace NoSqliteX
                     {
                         return Update(s => setter(s, item), s => equater(s));
                     }
-                    SetIndentityValue(item);
+                    OnBeforeInsert(item);
                     Items.Add(item);
                     if (!Save()) return false;
                     OnAfterInsert(item);
@@ -778,10 +903,7 @@ namespace NoSqliteX
 #endif
                 var alterFlag = new List<bool>();
                 if (items.IsNullOrEmpty()) return false;
-                foreach (var item in items)
-                {
-                    SetIndentityValue(item);
-                }
+                
                 OnBeforeInsert(items);
                 {
                     if (Items.IsNullOrEmpty()) Items = new List<T>();
@@ -837,11 +959,6 @@ namespace NoSqliteX
                 if (setter is null || equater is null)
                     throw new NullReferenceException();
 
-                
-                foreach (var item in items)
-                {
-                    SetIndentityValue(item);
-                }
                 OnBeforeInsert(items);
 
                 if (Items.IsNullOrEmpty()) Items = new List<T>();
@@ -894,6 +1011,7 @@ namespace NoSqliteX
                 var data = Items?.Where(equater)?.ToList();
                 //disparando a Trigger Before Update
                 OnBeforeUpdate(data);
+                
                 //captura os items que serão atualizados para retornar estes na trigger Before & After Update
                 var deleted = data;
                 /* quado não encontra registos a ser atualizado então retorna true
@@ -901,8 +1019,13 @@ namespace NoSqliteX
                  */
                 if (data.IsNullOrEmpty()) return true;
                 //Setando os dados nos registos 
-                Parallel.ForEach(Items.Where(equater), setter);
+                Items.Where(equater)?.ForEach(n =>
+                {
+                    setter(n);
+                    Encrypt(n);
+                });
                 //Salvando alterações nos registos
+                
                 Save();
                 // disparando a Trigger AfterUpdate
                 OnAfterUpdate(data, deleted);
@@ -941,9 +1064,16 @@ namespace NoSqliteX
                            decidi fazer isso pela experiencia que adiquiri ao longo dos anos enquanto trabalher com o MS SQLServer
                          */
                         //Setando os dados nos registos 
-                        Parallel.ForEach(Items.Where(x => equater(x, s)), x => setter(x, s));
+                        Items.Where(x => equater(x, s))?.ForEach(n =>
+                        {
+                            setter(n,s);
+                            Encrypt(n);
+                            Encrypt(s);
+                        });;
+                      
                     }
                 }
+               
                 //Salvando alterações nos registos
                 Save();
                 // disparando a Trigger AfterUpdate
@@ -990,6 +1120,14 @@ namespace NoSqliteX
         public IEnumerable<T> Where(Func<T, bool> equater)
         {
             return Items?.Where(equater);
+        }
+        public T FirstOrDefault(Func<T, bool> equater)
+        {
+            return Items?.FirstOrDefault(equater);
+        }
+        public bool Any(Func<T, bool> equater)
+        {
+            return Items?.Any(equater) ?? false;
         }
 
         #endregion
