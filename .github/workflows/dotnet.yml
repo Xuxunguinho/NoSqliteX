@@ -37,4 +37,4 @@ jobs:
       - name: "Package push"
         run: |
           cd out 
-          dotnet push *.nupkg -k ${{ secrets.GUITHUB_TOKEN }} -s "https://nuget.pkg.github.com/xuxunguinho/index.json" --skip-duplicate
+          dotnet push *.nupkg -k ${{ secrets.DEPLOY_TOKEN }} -s "https://nuget.pkg.github.com/xuxunguinho/index.json" --skip-duplicate
