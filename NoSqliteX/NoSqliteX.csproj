@@ -15,7 +15,9 @@ Offers even functions such as: Insert, Delete, Update and also uses triggers for
     <PackageLicenseUrl></PackageLicenseUrl>
     <RepositoryUrl>https://github.com/Xuxunguinho/NoSqliteX</RepositoryUrl>
     <PackageTags>NoSQL SQLite</PackageTags>
-    <TargetFrameworks>net6.0;netstandard2.0</TargetFrameworks>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>StrongNameKey.pfx</AssemblyOriginatorKeyFile>
+    <TargetFrameworks>net45;net5.0;netstandard2.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

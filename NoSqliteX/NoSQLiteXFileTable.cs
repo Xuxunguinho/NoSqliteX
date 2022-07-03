@@ -418,21 +418,7 @@ namespace NoSqliteX
                 throw new Exception(e.Message);
             }
         }
-        private void Encrypt(IEnumerable<T> item)
-        {
-            try
-            {
-                foreach (var x in item)
-                {
-                    Encrypt(x);
-                }
-               
-            }
-            catch (Exception e)
-            {
-                throw new Exception(e.Message);
-            }
-        }
+        
         private void DecryptItemValue(T item)
         {
             try
@@ -466,6 +452,11 @@ namespace NoSqliteX
                  _stream?.Close();
                   if (_fileName.IsNullOrEmpty()) return false;
                   var  stream = File.Open(_fileName, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+                  foreach (var x in Items)
+                  {
+                      Encrypt(x);
+                  }
                   var json =  JsonConvert.SerializeObject(Items);
                   var writer = new StreamWriter(stream);
                   writer.Write(json);
@@ -498,7 +489,6 @@ namespace NoSqliteX
                 foreach (var x in deserialized)
                 {
                     DecryptItemValue(x);
-                    
                 }
 
                 Items = deserialized;
@@ -528,14 +518,12 @@ namespace NoSqliteX
         private void OnBeforeInsert(T item)
         {
             SetIndentity(item);
-            Encrypt(item);
             _beforeInsert?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
         private void OnBeforeOverride(T item)
         {
-            SetIndentity(item);
-            Encrypt(item);
+             SetIndentity(item);
             _beforeOverride?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
 
@@ -562,16 +550,16 @@ namespace NoSqliteX
         private void OnBeforeInsert(List<T> item)
         {
              SetIndentity(item);
-             Encrypt(item);
+            
             _beforeInserts?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         }
         private void OnBeforeUpdate(List<T> item)
         {
-             // Encrypt(item);
+             //
             _beforeUpdates?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         } private void OnBeforeUpdate(T item)
         {
-             Encrypt(item);
+            
             _beforeUpdate?.Invoke(this, new NoSqliteXTrigger<T>(item));
         }
         private void OnBeforeDelete(List<T> item)
@@ -583,7 +571,7 @@ namespace NoSqliteX
         private void OnBeforeOverride(List<T> item)
         {
             SetIndentity(item);
-            Encrypt(item);
+           
             _beforeOverrides?.Invoke(this, new NoSqliteXTrigger<List<T>>(item));
         }
 
@@ -1022,7 +1010,6 @@ namespace NoSqliteX
                 Items.Where(equater)?.ForEach(n =>
                 {
                     setter(n);
-                    Encrypt(n);
                 });
                 //Salvando alterações nos registos
                 
@@ -1067,9 +1054,9 @@ namespace NoSqliteX
                         Items.Where(x => equater(x, s))?.ForEach(n =>
                         {
                             setter(n,s);
-                            Encrypt(n);
-                            Encrypt(s);
+                          
                         });;
+                       
                       
                     }
                 }
